@@ -163,7 +163,6 @@ void S2mmAttachBuffer (S2mmTransferHierarchy *InstPtr, UINTPTR Buffer, u32 Buffe
 *****************************************************************************/
 void S2mmCleanup(S2mmTransferHierarchy *InstPtr) {
 	// Spin down the hardware.
-	// FIXME: check if
 	XAxiDma_Pause(&(InstPtr->Dma));
 	XAxiDma_Reset(&(InstPtr->Dma));
 	while (!XAxiDma_ResetIsDone(&(InstPtr->Dma)));
@@ -172,7 +171,9 @@ void S2mmCleanup(S2mmTransferHierarchy *InstPtr) {
 	InstPtr->BufferBaseAddr = NULL;
 	InstPtr->BufferLength = 0;
 	InstPtr->NumBds = 0;
-	free((void*)(InstPtr->BdSpace)); // FIXME: throws data abort exception
+	// FIXME: throws data abort exception
+	// Oddly, issue seems to not occur in 2024.1 vitis classic
+	free((void*)(InstPtr->BdSpace));
 	InstPtr->BdSpace = NULL;
 }
 

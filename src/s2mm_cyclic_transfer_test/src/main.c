@@ -461,8 +461,6 @@ XStatus AcquireDataToConsole (InputPipeline *InstPtr, ZmodScopeRelayConfig Relay
 	return XST_SUCCESS;
 }
 
-
-//
 XStatus LevelTriggerAcquisition (InputPipeline *InstPtr, ZmodScopeRelayConfig Relays, u32 TrigEnable, u16 Ch1Level, u16 Ch2Level) {
 	// Initialize device drivers
 	S2mmTransferHierarchy *S2mmPtr = &(InstPtr->S2mm);
@@ -604,6 +602,14 @@ int main () {
 	ZmodScopeRelayConfig CouplingTestRelays = {0, 0, 1, 0};
 	ZmodScopeRelayConfig GainTestRelays = {1, 0, 0, 0};
 	ZmodScopeRelayConfig HighGainDcCoupling = {1, 1, 1, 1};
+
+	LevelTriggerAcquisition (
+			&Pipe,
+			GainTestRelays,
+			0b00010, // enable only channel 1 rising level trigger
+			VoltsToTriggerLevel(0.5f, 14, GainTestRelays.Ch1Gain),
+			VoltsToTriggerLevel(0.5f, 14, GainTestRelays.Ch2Gain)
+			);
 
 	LevelTriggerAcquisition (
 			&Pipe,
