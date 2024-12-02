@@ -54,7 +54,7 @@ void S2mmInitialize (S2mmTransferHierarchy *InstPtr, const u32 DmaDeviceId) {
 *		       whether it is actually final or not, it is unknown whether the next acquisition will reuse the same buffer, and the blocks must be
 *		       available to hardware to prefetch before the block before them is complete.
 *		FIXME: At time of writing, buffer length is restricted to values of N * MaxBurstLengthBytes, where N is an integer and MaxBurstLengthBytes
-*		       is 256x64/8=1024 bytes (BurstSize x DataWidth bits). Whether BufferLength meets this requirement is not checked within this function.
+*		       is 256x64/8=1024 bytes (BurstSize x DataWidth bits).
 *		       If buffer length doesn't meet this requirement, S2mmFindStartOfBuffer may not return the correct address in some edge cases.
 *		FIXME: It should be explored whether multiple buffers can easily be attached and switched out (perhaps by taking advantage of multiple Rx rings)
 *			   in order to allow an acquisition to occur at the same time as a previous acquisition is being transferred to the host.
@@ -82,6 +82,10 @@ void S2mmAttachBuffer (S2mmTransferHierarchy *InstPtr, UINTPTR Buffer, u32 Buffe
 	InstPtr->BufferBaseAddr = (u32*)Buffer;
 	InstPtr->BufferLength = BufferLength;
 
+	if ((InstPtr->BufferLength & 0x7ff) != 0) {
+		xil_printf("ERROR: Buffer length must be an integer multiple of 0x800\r\n");
+	}
+
 	// Allocate the memory space holding DMA block descriptors
 	// Note: Xilinx doesn't support dynamic allocation of aligned memory, so we need to allocate more memory than is actually needed in order to guarantee alignment
 	InstPtr->NumBds = RoundUpDivide(BufferLength * sizeof(u32), InstPtr->MaxBurstLengthBytes);
@@ -94,27 +98,27 @@ void S2mmAttachBuffer (S2mmTransferHierarchy *InstPtr, UINTPTR Buffer, u32 Buffe
 	XAxiDma_BdRingIntDisable(RingPtr, XAXIDMA_IRQ_ALL_MASK);
 	Status = XAxiDma_BdRingSetCoalesce(RingPtr, Coalesce, Delay); // defaults, this design isn't doing anything with interrupts
 	if (Status != XST_SUCCESS) {
-		xil_printf("XAxiDma_BdRingSetCoalesce failed for s2mm instance 0x%08x\r\n", InstPtr);
+		xil_printf("ERROR: XAxiDma_BdRingSetCoalesce failed for s2mm instance 0x%08x\r\n", InstPtr);
 	}
 
 	// Set up the BD ring to use the allocated memory space
 	Status = XAxiDma_BdRingCreate(RingPtr, (UINTPTR)(BdSpaceAligned), (UINTPTR)(BdSpaceAligned), XAXIDMA_BD_MINIMUM_ALIGNMENT, InstPtr->NumBds);
 	if (Status != XST_SUCCESS) {
-		xil_printf("XAxiDma_BdRingCreate failed for s2mm instance 0x%08x\r\n", InstPtr);
+		xil_printf("ERROR: XAxiDma_BdRingCreate failed for s2mm instance 0x%08x\r\n", InstPtr);
 	}
 
 	// use a all-zero bd as template
 	XAxiDma_BdClear(&BdTemplate);
 	Status = XAxiDma_BdRingClone(RingPtr, &BdTemplate);
 	if (Status != XST_SUCCESS) {
-		xil_printf("XAxiDma_BdRingClone failed for s2mm instance 0x%08x\r\n", InstPtr);
+		xil_printf("ERROR: XAxiDma_BdRingClone failed for s2mm instance 0x%08x\r\n", InstPtr);
 	}
 
 	//allocate descriptors to fill the entire space
 	FreeBdCount = XAxiDma_BdRingGetFreeCnt(RingPtr);
 	Status = XAxiDma_BdRingAlloc(RingPtr, FreeBdCount, &BdPtr);
 	if (Status != XST_SUCCESS) {
-		xil_printf("XAxiDma_BdRingAlloc failed for s2mm instance 0x%08x\r\n", InstPtr);
+		xil_printf("ERROR: XAxiDma_BdRingAlloc failed for s2mm instance 0x%08x\r\n", InstPtr);
 	}
 
 	BdCurPtr = BdPtr;
@@ -129,12 +133,12 @@ void S2mmAttachBuffer (S2mmTransferHierarchy *InstPtr, UINTPTR Buffer, u32 Buffe
 
 		Status = XAxiDma_BdSetBufAddr(BdCurPtr, (UINTPTR)BdBufferPtr);
 		if (Status != XST_SUCCESS) {
-			xil_printf("XAxiDma_BdSetBufAddr failed for s2mm instance 0x%08x, BD %d\r\n", InstPtr, Index);
+			xil_printf("ERROR: XAxiDma_BdSetBufAddr failed for s2mm instance 0x%08x, BD %d\r\n", InstPtr, Index);
 		}
 
 		Status = XAxiDma_BdSetLength(BdCurPtr, BdLength, RingPtr->MaxTransferLen);
 		if (Status != XST_SUCCESS) {
-			xil_printf("XAxiDma_BdSetBufAddr failed for s2mm instance 0x%08x, BD %d\r\n", InstPtr, Index);
+			xil_printf("ERROR: XAxiDma_BdSetBufAddr failed for s2mm instance 0x%08x, BD %d\r\n", InstPtr, Index);
 		}
 
 		XAxiDma_BdSetCtrl(BdCurPtr, 0);
@@ -146,7 +150,7 @@ void S2mmAttachBuffer (S2mmTransferHierarchy *InstPtr, UINTPTR Buffer, u32 Buffe
 
 	Status = XAxiDma_BdRingToHw(RingPtr, FreeBdCount, BdPtr);
 	if (Status != XST_SUCCESS) {
-		xil_printf("XAxiDma_BdRingToHw failed for s2mm instance 0x%08x\r\n", InstPtr);
+		xil_printf("ERROR: XAxiDma_BdRingToHw failed for s2mm instance 0x%08x\r\n", InstPtr);
 	}
 }
 
